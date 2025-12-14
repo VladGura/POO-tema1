@@ -1,0 +1,70 @@
+[
+  {
+    "email": "ana@example.com",
+    "password": "parolaAna",
+    "points": 120,
+    "games": [
+      1,
+      2
+    ]
+  },
+  {
+    "email": "mihai@example.com",
+    "password": "parolaMihai",
+    "points": 45,
+    "games": [
+      3,
+      4
+    ]
+  },
+  {
+    "email": "ioana@example.com",
+    "password": "parolaIoana",
+    "points": 300,
+    "games": [
+      5
+    ]
+  },
+  {
+    "email": "george@example.com",
+    "password": "parolaGeorge",
+    "points": 75,
+    "games": [
+      6
+    ]
+  },
+  {
+    "email": "andrei@example.com",
+    "password": "parolaAndrei",
+    "points": 10,
+    "games": [
+      7,
+      8
+    ]
+  },
+  {
+    "email": "elena@example.com",
+    "password": "parolaElena",
+    "points": 0,
+    "games": [
+      9
+    ]
+  },
+  {
+    "email": "roxana@example.com",
+    "password": "parolaRoxana",
+    "points": 210,
+    "games": [
+      10,
+      11
+    ]
+  },
+  {
+    "email": "vlad@example.com",
+    "password": "parolaVlad",
+    "points": 15,
+    "games": [
+      12
+    ]
+  }
+]
