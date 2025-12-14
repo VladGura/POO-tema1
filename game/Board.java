@@ -12,47 +12,61 @@ public class Board {
 
     private final Set<ChessPair<Position, Piece>> pieces = new TreeSet<>();
 
-    public Board() {
-        initialize();
-    }
+    public Board() { }
 
-    public void clear() {
-        pieces.clear();
-    }
+    public Set<ChessPair<Position, Piece>> getPieces() { return pieces; }
 
-    public void addPiece(Piece piece) {
-        if (piece == null || piece.getPosition() == null) return;
-        pieces.removeIf(p -> p.getKey().equals(piece.getPosition()));
-        pieces.add(new ChessPair<>(piece.getPosition(), piece));
-    }
+    public void clear() { pieces.clear(); }
 
-    public Set<ChessPair<Position, Piece>> getPieces() {
-        return pieces;
-    }
-
-    public Piece getPieceAt(Position position) {
-        for (ChessPair<Position, Piece> pair : pieces) {
-            if (pair.getKey().equals(position)) return pair.getValue();
-        }
-        return null;
-    }
-
-    public void removeAt(Position position) {
-        if (position == null) return;
-        pieces.removeIf(p -> p.getKey().equals(position));
+    // ✅ normalizeaza mereu pe A..H
+    private Position norm(Position p) {
+        if (p == null) return null;
+        char x = Character.toUpperCase(p.getX());
+        return new Position(x, p.getY());
     }
 
     public boolean inBounds(Position p) {
+        p = norm(p);
         if (p == null) return false;
         char x = p.getX();
         int y = p.getY();
         return x >= 'A' && x <= 'H' && y >= 1 && y <= 8;
     }
 
+    public Piece getPieceAt(Position position) {
+        position = norm(position);
+        if (position == null) return null;
+
+        for (ChessPair<Position, Piece> pair : pieces) {
+            if (pair == null || pair.getKey() == null) continue;
+            Position k = norm(pair.getKey());
+            if (position.equals(k)) return pair.getValue();
+        }
+        return null;
+    }
+
+    public void addPiece(Piece piece) {
+        if (piece == null || piece.getPosition() == null) return;
+        // ✅ fortam pozitia piesei pe A..H
+        piece.setPosition(norm(piece.getPosition()));
+        pieces.add(new ChessPair<>(piece.getPosition(), piece));
+    }
+
+    public void removeAt(Position position) {
+        position = norm(position);
+        if (position == null) return;
+
+        ChessPair<Position, Piece> target = null;
+        for (ChessPair<Position, Piece> pair : pieces) {
+            if (pair == null || pair.getKey() == null) continue;
+            if (position.equals(norm(pair.getKey()))) { target = pair; break; }
+        }
+        if (target != null) pieces.remove(target);
+    }
+
     public void initialize() {
         clear();
 
-        // WHITE
         addPiece(new Rook(Colors.WHITE, new Position('A', 1)));
         addPiece(new Knight(Colors.WHITE, new Position('B', 1)));
         addPiece(new Bishop(Colors.WHITE, new Position('C', 1)));
@@ -61,9 +75,8 @@ public class Board {
         addPiece(new Bishop(Colors.WHITE, new Position('F', 1)));
         addPiece(new Knight(Colors.WHITE, new Position('G', 1)));
         addPiece(new Rook(Colors.WHITE, new Position('H', 1)));
-        for (char x = 'A'; x <= 'H'; x++) addPiece(new Pawn(Colors.WHITE, new Position(x, 2)));
+        for (char c = 'A'; c <= 'H'; c++) addPiece(new Pawn(Colors.WHITE, new Position(c, 2)));
 
-        // BLACK
         addPiece(new Rook(Colors.BLACK, new Position('A', 8)));
         addPiece(new Knight(Colors.BLACK, new Position('B', 8)));
         addPiece(new Bishop(Colors.BLACK, new Position('C', 8)));
@@ -72,98 +85,74 @@ public class Board {
         addPiece(new Bishop(Colors.BLACK, new Position('F', 8)));
         addPiece(new Knight(Colors.BLACK, new Position('G', 8)));
         addPiece(new Rook(Colors.BLACK, new Position('H', 8)));
-        for (char x = 'A'; x <= 'H'; x++) addPiece(new Pawn(Colors.BLACK, new Position(x, 7)));
+        for (char c = 'A'; c <= 'H'; c++) addPiece(new Pawn(Colors.BLACK, new Position(c, 7)));
     }
 
     public String render() {
         StringBuilder sb = new StringBuilder();
-        sb.append("    A B C D E F G H\n");
-        sb.append("   -----------------\n");
         for (int y = 8; y >= 1; y--) {
-            sb.append(y).append(" | ");
+            sb.append(y).append(" ");
             for (char x = 'A'; x <= 'H'; x++) {
                 Piece p = getPieceAt(new Position(x, y));
-                if (p == null) sb.append(". ");
+                if (p == null) sb.append(".  ");
                 else {
                     char t = p.type();
-                    if (p.getColor() == Colors.BLACK) t = Character.toLowerCase(t);
-                    sb.append(t).append(' ');
+                    char c = (p.getColor() == Colors.WHITE) ? 'W' : 'B';
+                    sb.append(t).append("-").append(c).append(" ");
                 }
             }
-            sb.append("| ").append(y).append('\n');
+            sb.append("\n");
         }
-        sb.append("   -----------------\n");
-        sb.append("    A B C D E F G H\n");
+        sb.append("   A   B   C   D   E   F   G   H\n");
         return sb.toString();
     }
 
-    // ------------------- CHECK LOGIC -------------------
-
     private Position findKing(Colors color) {
         for (ChessPair<Position, Piece> pair : pieces) {
-            Piece p = pair.getValue();
-            if (p instanceof King && p.getColor() == color) return p.getPosition();
+            Piece piece = (pair != null) ? pair.getValue() : null;
+            if (piece instanceof King && piece.getColor() == color) return norm(pair.getKey());
         }
         return null;
     }
 
-    // true daca "target" e atacat de "attacker"
-    private boolean isSquareAttacked(Position target, Colors attacker) {
+    public boolean isInCheck(Colors kingColor) {
+        Position kingPos = findKing(kingColor);
+        if (kingPos == null) return false;
+        Colors attacker = (kingColor == Colors.WHITE) ? Colors.BLACK : Colors.WHITE;
+        return isSquareAttacked(kingPos, attacker);
+    }
+
+    private boolean isSquareAttacked(Position square, Colors byColor) {
+        square = norm(square);
         for (ChessPair<Position, Piece> pair : pieces) {
-            Piece p = pair.getValue();
-            if (p.getColor() != attacker) continue;
+            Piece p = (pair != null) ? pair.getValue() : null;
+            if (p == null || p.getColor() != byColor) continue;
 
-            if (p instanceof Pawn) {
-                if (pawnAttacks((Pawn) p, target)) return true;
-                continue;
-            }
+            List<Position> moves = p.getPossibleMoves(this);
+            if (moves == null) continue;
 
-            if (p instanceof King) {
-                if (kingAttacks((King) p, target)) return true;
-                continue;
-            }
-
-            // pt rook/bishop/queen/knight: getPossibleMoves = squares attacked (in modelul nostru simplu)
-            for (Position m : p.getPossibleMoves(this)) {
-                if (m.equals(target)) return true;
+            for (Position m : moves) {
+                if (m != null && norm(m).equals(square)) return true;
             }
         }
         return false;
     }
 
-    private boolean pawnAttacks(Pawn pawn, Position target) {
-        if (pawn == null || pawn.getPosition() == null || target == null) return false;
-        Position pos = pawn.getPosition();
-        int dir = (pawn.getColor() == Colors.WHITE) ? 1 : -1;
+    private boolean wouldLeaveKingInCheck(Position from, Position to, Colors currentColor) {
+        from = norm(from);
+        to = norm(to);
 
-        Position diagL = new Position((char) (pos.getX() - 1), pos.getY() + dir);
-        Position diagR = new Position((char) (pos.getX() + 1), pos.getY() + dir);
-
-        return (inBounds(diagL) && diagL.equals(target)) || (inBounds(diagR) && diagR.equals(target));
-    }
-
-    private boolean kingAttacks(King king, Position target) {
-        if (king == null || king.getPosition() == null || target == null) return false;
-        Position k = king.getPosition();
-        int dx = Math.abs(k.getX() - target.getX());
-        int dy = Math.abs(k.getY() - target.getY());
-        return dx <= 1 && dy <= 1 && !(dx == 0 && dy == 0);
-    }
-
-    private boolean wouldLeaveKingInCheck(Position from, Position to, Colors mover) {
         Piece moving = getPieceAt(from);
         Piece captured = getPieceAt(to);
 
-        // apply temporary
         removeAt(from);
         if (captured != null) removeAt(to);
+
         moving.setPosition(to);
         addPiece(moving);
 
-        Position kingPos = findKing(mover);
-        boolean inCheck = (kingPos != null) && isSquareAttacked(kingPos, (mover == Colors.WHITE) ? Colors.BLACK : Colors.WHITE);
+        boolean inCheck = isInCheck(currentColor);
 
-        // undo
         removeAt(to);
         moving.setPosition(from);
         addPiece(moving);
@@ -172,16 +161,57 @@ public class Board {
         return inCheck;
     }
 
-    public boolean isInCheck(Colors color) {
-        Position kingPos = findKing(color);
-        if (kingPos == null) return false;
-        Colors attacker = (color == Colors.WHITE) ? Colors.BLACK : Colors.WHITE;
-        return isSquareAttacked(kingPos, attacker);
+    public boolean isValidMove(Position from, Position to, Colors currentColor) {
+        from = norm(from);
+        to = norm(to);
+        if (!inBounds(from) || !inBounds(to)) return false;
+
+        Piece p = getPieceAt(from);
+        if (p == null || p.getColor() != currentColor) return false;
+
+        Piece dst = getPieceAt(to);
+        if (dst != null && dst.getColor() == currentColor) return false;
+
+        List<Position> moves = p.getPossibleMoves(this);
+        if (moves == null) return false;
+
+        boolean ok = false;
+        for (Position pp : moves) {
+            if (pp != null && norm(pp).equals(to)) { ok = true; break; }
+        }
+        if (!ok) return false;
+
+        return !wouldLeaveKingInCheck(from, to, currentColor);
     }
 
-    // ------------------- MOVE VALIDATION -------------------
+    public boolean requiresPromotion(Position from, Position to) {
+        from = norm(from);
+        to = norm(to);
+        Piece p = getPieceAt(from);
+        if (!(p instanceof Pawn)) return false;
+        if (p.getColor() == Colors.WHITE && to.getY() == 8) return true;
+        if (p.getColor() == Colors.BLACK && to.getY() == 1) return true;
+        return false;
+    }
 
+    public void movePiece(Position from, Position to) throws InvalidMoveException {
+        from = norm(from);
+        to = norm(to);
+        Piece p = getPieceAt(from);
+        if (p == null) throw new InvalidMoveException("No piece at " + from);
+        movePiece(from, to, p.getColor(), 'Q');
+    }
+
+    // compat vechi
     public void movePiece(Position from, Position to, Colors currentColor) throws InvalidMoveException {
+        movePiece(from, to, currentColor, 'Q');
+    }
+
+    // cu promotion
+    public void movePiece(Position from, Position to, Colors currentColor, char promoteTo) throws InvalidMoveException {
+        from = norm(from);
+        to = norm(to);
+
         if (!inBounds(from) || !inBounds(to)) throw new InvalidMoveException("Out of board");
 
         Piece piece = getPieceAt(from);
@@ -189,26 +219,34 @@ public class Board {
         if (piece.getColor() != currentColor) throw new InvalidMoveException("Not your piece");
 
         Piece dst = getPieceAt(to);
-        if (dst != null && dst.getColor() == currentColor) {
-            throw new InvalidMoveException("Destination occupied by your piece");
-        }
+        if (dst != null && dst.getColor() == currentColor)
+            throw new InvalidMoveException("Destination occupied");
 
-        // legal move for that piece
+        List<Position> moves = piece.getPossibleMoves(this);
+        if (moves == null) throw new InvalidMoveException("No moves");
+
         boolean ok = false;
-        for (Position p : piece.getPossibleMoves(this)) {
-            if (p.equals(to)) { ok = true; break; }
+        for (Position p : moves) {
+            if (p != null && norm(p).equals(to)) { ok = true; break; }
         }
-        if (!ok) throw new InvalidMoveException("Illegal move for " + piece.type());
+        if (!ok) throw new InvalidMoveException("Illegal move");
 
-        // NEW: forbid moves that leave your king in check
-        if (wouldLeaveKingInCheck(from, to, currentColor)) {
+        if (wouldLeaveKingInCheck(from, to, currentColor))
             throw new InvalidMoveException("Move leaves king in check");
-        }
 
-        // apply real move
         removeAt(from);
         if (dst != null) removeAt(to);
+
         piece.setPosition(to);
+
+        if (piece instanceof Pawn && requiresPromotion(from, to)) {
+            char t = Character.toUpperCase(promoteTo);
+            if (t == 'R') piece = new Rook(currentColor, to);
+            else if (t == 'B') piece = new Bishop(currentColor, to);
+            else if (t == 'N') piece = new Knight(currentColor, to);
+            else piece = new Queen(currentColor, to);
+        }
+
         addPiece(piece);
     }
 }
